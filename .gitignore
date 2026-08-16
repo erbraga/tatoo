@@ -13,3 +13,6 @@ build/
 # Testes / lint
 .pytest_cache/
 .ruff_cache/
+
+#imagens
+img/

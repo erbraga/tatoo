@@ -7,7 +7,9 @@ authors = [
     { name = "erbraga", email = "erbraga@uol.com.br" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pillow>=12.3.0",
+]
 
 [project.scripts]
 tatoo = "tatoo:main"
