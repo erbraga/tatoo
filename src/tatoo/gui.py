@@ -4,11 +4,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from PIL import Image, ImageDraw, ImageTk
+
 from tatoo.watermark import apply_watermark
 
 FILETYPES = [("Imagens", "*.png *.jpg *.jpeg *.webp")]
-MIN_WIDTH = 420
-MIN_HEIGHT = 420
+MIN_WIDTH = 480
+MIN_HEIGHT = 600
+THUMBNAIL_SIZE = (96, 96)
 
 
 @dataclass
@@ -63,6 +66,70 @@ def _make_listbox_with_scrollbar(parent: ttk.Frame, row: int) -> tk.Listbox:
     return listbox
 
 
+def _make_scrollable_frame(parent: ttk.Frame, row: int) -> ttk.Frame:
+    container = ttk.Frame(parent)
+    container.grid(column=0, row=row, sticky="nsew", pady=(4, 12))
+    container.columnconfigure(0, weight=1)
+    container.rowconfigure(0, weight=1)
+
+    canvas = tk.Canvas(container, highlightthickness=0)
+    canvas.grid(column=0, row=0, sticky="nsew")
+
+    scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    scrollbar.grid(column=1, row=0, sticky="ns")
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    inner = ttk.Frame(canvas)
+    inner_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+    def _on_inner_configure(_event: tk.Event) -> None:
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def _on_canvas_configure(event: tk.Event) -> None:
+        canvas.itemconfigure(inner_id, width=event.width)
+
+    inner.bind("<Configure>", _on_inner_configure)
+    canvas.bind("<Configure>", _on_canvas_configure)
+
+    return inner
+
+
+def _placeholder_thumbnail_image(size: tuple[int, int] = THUMBNAIL_SIZE) -> ImageTk.PhotoImage:
+    img = Image.new("RGB", size, (200, 200, 200))
+    draw = ImageDraw.Draw(img)
+    draw.line([(0, 0), (size[0], size[1])], fill=(150, 0, 0), width=4)
+    draw.line([(0, size[1]), (size[0], 0)], fill=(150, 0, 0), width=4)
+    return ImageTk.PhotoImage(img)
+
+
+def _make_thumbnail_image(path: Path, size: tuple[int, int] = THUMBNAIL_SIZE) -> ImageTk.PhotoImage:
+    try:
+        with Image.open(path) as img:
+            img = img.convert("RGB")
+            img.thumbnail(size)
+            return ImageTk.PhotoImage(img)
+    except Exception:  # noqa: BLE001 - qualquer falha vira placeholder de erro
+        return _placeholder_thumbnail_image(size)
+
+
+def _populate_selected_area(container: ttk.Frame, paths: list[Path]) -> list[ImageTk.PhotoImage]:
+    for child in container.winfo_children():
+        child.destroy()
+
+    images: list[ImageTk.PhotoImage] = []
+    for path in paths:
+        thumbnail = _make_thumbnail_image(path)
+        images.append(thumbnail)
+
+        row = ttk.Frame(container)
+        row.pack(fill="x", pady=4)
+
+        ttk.Label(row, image=thumbnail).pack(side="left", padx=(0, 8))
+        ttk.Label(row, text=path.name).pack(side="left")
+
+    return images
+
+
 def build_window() -> tk.Tk:
     root = tk.Tk()
     root.title("tatoo")
@@ -73,6 +140,7 @@ def build_window() -> tk.Tk:
     root.rowconfigure(0, weight=1)
 
     selected_paths: list[Path] = []
+    thumbnail_refs: list[ImageTk.PhotoImage] = []
     progress_text = tk.StringVar(value="")
     result_summary_text = tk.StringVar(value="")
 
@@ -85,7 +153,7 @@ def build_window() -> tk.Tk:
     select_button = ttk.Button(frame, text="Selecionar imagem(ns)")
     select_button.grid(column=0, row=0, sticky="ew")
 
-    selected_listbox = _make_listbox_with_scrollbar(frame, row=1)
+    selected_area = _make_scrollable_frame(frame, row=1)
 
     apply_button = ttk.Button(frame, text="Aplicar marca d'água")
     apply_button.grid(column=0, row=2, sticky="ew")
@@ -103,7 +171,8 @@ def build_window() -> tk.Tk:
         if paths:
             selected_paths.clear()
             selected_paths.extend(Path(p) for p in paths)
-            _set_listbox_items(selected_listbox, [p.name for p in selected_paths])
+            thumbnail_refs.clear()
+            thumbnail_refs.extend(_populate_selected_area(selected_area, selected_paths))
             progress_text.set("")
             result_summary_text.set("")
             _set_listbox_items(result_listbox, [])
@@ -129,7 +198,7 @@ def build_window() -> tk.Tk:
 
     root.select_button = select_button
     root.apply_button = apply_button
-    root.selected_listbox = selected_listbox
+    root.selected_area = selected_area
     root.progress_label = progress_label
     root.result_summary_label = result_summary_label
     root.result_listbox = result_listbox

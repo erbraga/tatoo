@@ -1,4 +1,5 @@
 import shutil
+import tkinter as tk
 from pathlib import Path
 
 import pytest
@@ -33,3 +34,10 @@ def broken_image(tmp_path) -> Path:
     path = tmp_path / "quebrada.png"
     path.write_bytes(b"nao e uma imagem")
     return path
+
+
+@pytest.fixture
+def tk_root():
+    root = tk.Tk()
+    yield root
+    root.destroy()
