@@ -1,2 +1,5 @@
+from tatoo.gui import build_window
+
+
 def main() -> None:
-    print("Hello from tatoo!")
+    build_window().mainloop()
