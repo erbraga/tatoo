@@ -13,9 +13,35 @@ def test_build_window_creates_expected_widgets():
         assert str(root.select_button["text"]) == "Selecionar imagem(ns)"
         assert str(root.apply_button["text"]) == "Aplicar marca d'água"
         assert root.selected_area.winfo_exists()
+        assert root.progress_bar.winfo_exists()
+        assert root.progress_bar["value"] == 0
         assert root.progress_label.winfo_exists()
         assert root.result_summary_label.winfo_exists()
         assert root.result_listbox.winfo_exists()
+    finally:
+        root.destroy()
+
+
+def test_import_progress_updates_bar_with_red_style(png_image, jpg_image):
+    root = build_window()
+    try:
+        root.on_import_progress(1, 2)
+
+        assert root.progress_bar["style"] == "Importando.Horizontal.TProgressbar"
+        assert root.progress_bar["value"] == 1
+        assert int(root.progress_bar["maximum"]) == 2
+    finally:
+        root.destroy()
+
+
+def test_apply_progress_updates_bar_with_green_style():
+    root = build_window()
+    try:
+        root.on_apply_progress(3, 4)
+
+        assert root.progress_bar["style"] == "Processando.Horizontal.TProgressbar"
+        assert root.progress_bar["value"] == 3
+        assert int(root.progress_bar["maximum"]) == 4
     finally:
         root.destroy()
 

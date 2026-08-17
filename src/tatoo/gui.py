@@ -12,6 +12,8 @@ FILETYPES = [("Imagens", "*.png *.jpg *.jpeg *.webp")]
 MIN_WIDTH = 480
 MIN_HEIGHT = 600
 THUMBNAIL_SIZE = (96, 96)
+IMPORT_PROGRESS_STYLE = "Importando.Horizontal.TProgressbar"
+APPLY_PROGRESS_STYLE = "Processando.Horizontal.TProgressbar"
 
 
 @dataclass
@@ -113,12 +115,20 @@ def _make_thumbnail_image(path: Path, size: tuple[int, int] = THUMBNAIL_SIZE) ->
         return _placeholder_thumbnail_image(size)
 
 
-def _populate_selected_area(container: ttk.Frame, paths: list[Path]) -> list[ImageTk.PhotoImage]:
+def _populate_selected_area(
+    container: ttk.Frame,
+    paths: list[Path],
+    on_progress: Callable[[int, int], None] | None = None,
+) -> list[ImageTk.PhotoImage]:
     for child in container.winfo_children():
         child.destroy()
 
+    total = len(paths)
     images: list[ImageTk.PhotoImage] = []
-    for path in paths:
+    for index, path in enumerate(paths, start=1):
+        if on_progress is not None:
+            on_progress(index, total)
+
         thumbnail = _make_thumbnail_image(path)
         images.append(thumbnail)
 
@@ -140,6 +150,10 @@ def build_window() -> tk.Tk:
     root.columnconfigure(0, weight=1)
     root.rowconfigure(0, weight=1)
 
+    style = ttk.Style(root)
+    style.configure(IMPORT_PROGRESS_STYLE, background="red")
+    style.configure(APPLY_PROGRESS_STYLE, background="green")
+
     selected_paths: list[Path] = []
     thumbnail_refs: list[ImageTk.PhotoImage] = []
     progress_text = tk.StringVar(value="")
@@ -149,7 +163,7 @@ def build_window() -> tk.Tk:
     frame.grid(column=0, row=0, sticky="nsew")
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(1, weight=1)
-    frame.rowconfigure(5, weight=1)
+    frame.rowconfigure(6, weight=1)
 
     select_button = ttk.Button(frame, text="Selecionar imagem(ns)")
     select_button.grid(column=0, row=0, sticky="ew")
@@ -159,26 +173,41 @@ def build_window() -> tk.Tk:
     apply_button = ttk.Button(frame, text="Aplicar marca d'água")
     apply_button.grid(column=0, row=2, sticky="ew")
 
+    progress_bar = ttk.Progressbar(frame, mode="determinate", value=0, style=IMPORT_PROGRESS_STYLE)
+    progress_bar.grid(column=0, row=3, sticky="ew", pady=(12, 0))
+
     progress_label = ttk.Label(frame, textvariable=progress_text)
-    progress_label.grid(column=0, row=3, sticky="w", pady=(12, 4))
+    progress_label.grid(column=0, row=4, sticky="w", pady=(4, 4))
 
     result_summary_label = ttk.Label(frame, textvariable=result_summary_text)
-    result_summary_label.grid(column=0, row=4, sticky="w")
+    result_summary_label.grid(column=0, row=5, sticky="w")
 
-    result_listbox = _make_listbox_with_scrollbar(frame, row=5)
+    result_listbox = _make_listbox_with_scrollbar(frame, row=6)
+
+    def on_import_progress(index: int, total: int) -> None:
+        progress_bar.configure(style=IMPORT_PROGRESS_STYLE, maximum=total, value=index)
+        progress_text.set(f"importando {index} de {total}...")
+        root.update_idletasks()
 
     def select_images() -> None:
         paths = filedialog.askopenfilenames(title="Selecionar imagem(ns)", filetypes=FILETYPES)
         if paths:
             selected_paths.clear()
             selected_paths.extend(Path(p) for p in paths)
+            progress_bar.configure(
+                style=IMPORT_PROGRESS_STYLE, value=0, maximum=len(selected_paths)
+            )
             thumbnail_refs.clear()
-            thumbnail_refs.extend(_populate_selected_area(selected_area, selected_paths))
-            progress_text.set("")
+            thumbnail_refs.extend(
+                _populate_selected_area(
+                    selected_area, selected_paths, on_progress=on_import_progress
+                )
+            )
             result_summary_text.set("")
             _set_listbox_items(result_listbox, [])
 
-    def report_progress(index: int, total: int) -> None:
+    def on_apply_progress(index: int, total: int) -> None:
+        progress_bar.configure(style=APPLY_PROGRESS_STYLE, maximum=total, value=index)
         progress_text.set(f"Processando {index} de {total}...")
         root.update_idletasks()
 
@@ -188,8 +217,8 @@ def build_window() -> tk.Tk:
                 "Erro", "Selecione ao menos uma imagem antes de aplicar a marca d'água."
             )
             return
-        result = _process_files(selected_paths, on_progress=report_progress)
-        progress_text.set("")
+        progress_bar.configure(style=APPLY_PROGRESS_STYLE, value=0, maximum=len(selected_paths))
+        result = _process_files(selected_paths, on_progress=on_apply_progress)
         total = len(result.successes) + len(result.failures)
         result_summary_text.set(f"{len(result.successes)} de {total} processadas com sucesso")
         _set_listbox_items(result_listbox, _result_lines(result))
@@ -200,8 +229,11 @@ def build_window() -> tk.Tk:
     root.select_button = select_button
     root.apply_button = apply_button
     root.selected_area = selected_area
+    root.progress_bar = progress_bar
     root.progress_label = progress_label
     root.result_summary_label = result_summary_label
     root.result_listbox = result_listbox
+    root.on_import_progress = on_import_progress
+    root.on_apply_progress = on_apply_progress
 
     return root
