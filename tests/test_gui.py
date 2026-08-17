@@ -43,6 +43,13 @@ def test_make_thumbnail_image_falls_back_to_placeholder(tk_root, broken_image):
     assert thumbnail.height() == 96
 
 
+def test_make_thumbnail_image_respects_exif_orientation(tk_root, rotated_jpg_image):
+    thumbnail = _make_thumbnail_image(rotated_jpg_image)
+
+    assert thumbnail.height() == 96
+    assert thumbnail.width() < thumbnail.height()
+
+
 def test_populate_selected_area_creates_one_row_per_file(png_image, broken_image):
     root = build_window()
     try:
@@ -65,7 +72,7 @@ def test_process_files_all_succeed(png_image, jpg_image, webp_image):
 def test_process_files_partial_failure(png_image, broken_image):
     result = _process_files([png_image, broken_image])
 
-    assert result.successes == [png_image.with_stem(f"{png_image.stem}_marcada")]
+    assert result.successes == [png_image.with_name(f"{png_image.stem}_png_marcada.webp")]
     assert len(result.failures) == 1
     assert result.failures[0][0] == broken_image
 

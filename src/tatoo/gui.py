@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageOps, ImageTk
 
 from tatoo.watermark import apply_watermark
 
@@ -105,6 +105,7 @@ def _placeholder_thumbnail_image(size: tuple[int, int] = THUMBNAIL_SIZE) -> Imag
 def _make_thumbnail_image(path: Path, size: tuple[int, int] = THUMBNAIL_SIZE) -> ImageTk.PhotoImage:
     try:
         with Image.open(path) as img:
+            img = ImageOps.exif_transpose(img)
             img = img.convert("RGB")
             img.thumbnail(size)
             return ImageTk.PhotoImage(img)

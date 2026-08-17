@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-REAL_WEBP_SOURCE = Path("img/20260226_114501.webp")
+ROTATED_JPG_SOURCE = Path("img/20260219_110121.jpg")
 
 
 @pytest.fixture
@@ -24,8 +24,8 @@ def jpg_image(tmp_path) -> Path:
 
 @pytest.fixture
 def webp_image(tmp_path) -> Path:
-    path = tmp_path / REAL_WEBP_SOURCE.name
-    shutil.copy(REAL_WEBP_SOURCE, path)
+    path = tmp_path / "teste.webp"
+    Image.new("RGB", (300, 200), (80, 180, 120)).save(path, format="WEBP")
     return path
 
 
@@ -33,6 +33,13 @@ def webp_image(tmp_path) -> Path:
 def broken_image(tmp_path) -> Path:
     path = tmp_path / "quebrada.png"
     path.write_bytes(b"nao e uma imagem")
+    return path
+
+
+@pytest.fixture
+def rotated_jpg_image(tmp_path) -> Path:
+    path = tmp_path / ROTATED_JPG_SOURCE.name
+    shutil.copy(ROTATED_JPG_SOURCE, path)
     return path
 
 
